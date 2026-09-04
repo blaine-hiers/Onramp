@@ -1,0 +1,37 @@
+{
+  "name": "onramp",
+  "version": "1.0.0",
+  "description": "Minimal Node.js Model Context Protocol (MCP) server over stdio: tool-registry dispatch, var/ runtime layout, name-only env schema with a sync step, and a container path for non-stdio workers.",
+  "main": "server.mjs",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "env-sync": "node scripts/env-sync.mjs",
+    "test": "node --test --import ./scripts/setup-test-env.mjs"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "template",
+    "stdio",
+    "server",
+    "nodejs"
+  ],
+  "author": "Blaine Hiers",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "dotenv": "^17.4.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/blaine-hiers/Onramp.git"
+  },
+  "homepage": "https://github.com/blaine-hiers/Onramp#readme",
+  "bugs": {
+    "url": "https://github.com/blaine-hiers/Onramp/issues"
+  }
+}
