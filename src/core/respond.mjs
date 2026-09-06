@@ -17,7 +17,7 @@
  * Standard MCP tool response with an optional trailing hint. Every
  * read-tool handler ends with `return respond(text, args, hint);`.
  *
- * `args.no_hint` suppresses the trailing "Next step:" tool-chaining hint —
+ * `args.no_hint` suppresses the trailing "Next step:" tool-chaining hint:
  * it's guidance for an LLM/MCP client, just noise for a human-facing
  * surface that renders the text directly.
  *
@@ -37,7 +37,7 @@ export function textResponse(text) {
   return { content: [{ type: "text", text }] };
 }
 
-/** MCP error response — sets `isError` per the protocol. */
+/** MCP error response: sets `isError` per the protocol. */
 export function errorResponse(text) {
   return { isError: true, content: [{ type: "text", text }] };
 }
