@@ -1,6 +1,6 @@
 //
 // Single home for runtime-output locations. Everything the server and its
-// workers write at runtime — state files, logs, dated reports — lives under
+// workers write at runtime (state files, logs, dated reports) lives under
 // var/ so the repo root stays code + config only.
 //
 // Directory creation and legacy migration happen lazily, at the first call

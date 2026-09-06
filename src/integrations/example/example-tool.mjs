@@ -20,6 +20,9 @@ const CATEGORY = "example";
 export const tools = [
   {
     category: CATEGORY,
+    // Echo touches nothing outside the process, so it is a read and the
+    // gate lets it straight through. See src/core/effect.mjs.
+    effect: "read",
     schema: {
       name: "echo",
       description:

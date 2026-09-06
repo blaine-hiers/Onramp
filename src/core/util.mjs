@@ -2,7 +2,7 @@
  * =========================================================================
  *  SHARED UTILITIES
  * =========================================================================
- * Small pure helpers with no I/O and no side effects. Imported all over —
+ * Small pure helpers with no I/O and no side effects. Imported all over:
  * anything that would otherwise appear in two files belongs here.
  */
 
@@ -26,12 +26,12 @@ export function asBool(v, dflt = false) {
 }
 
 /**
- * Extract a useful error detail from an axios-shaped error — for logging or
- * showing to a tool caller — WITHOUT leaking an Authorization header some
+ * Extract a useful error detail from an axios-shaped error, for logging or
+ * showing to a tool caller, WITHOUT leaking an Authorization header some
  * APIs echo back verbatim on 401/403 responses.
  *
  * Redaction is two-layered on purpose. Key matching alone has two leaks:
- * a NON-object body (a proxy's HTML error page, a gateway's plain-text 401 —
+ * a NON-object body (a proxy's HTML error page, a gateway's plain-text 401,
  * exactly the responses that echo request diagnostics) passes through
  * key-based redaction untouched, and a token quoted INSIDE another key's
  * string value ("message": "rejected: authorization: Bearer ...") survives
@@ -46,7 +46,15 @@ const TOKEN_PATTERNS = [
   /\b(authorization\s*[:=]\s*)[^\s"',;]+/gi
 ];
 
-function redactString(s) {
+/**
+ * Scrub credential-shaped substrings out of free text.
+ *
+ * Exported because more than one subsystem has to redact, and every one of
+ * them must use the SAME patterns. A caller that copies these regexes is
+ * correct exactly until someone tightens them here, at which point the copy
+ * silently becomes the one place still writing a live token to disk.
+ */
+export function redactString(s) {
   let out = s;
   out = out.replace(TOKEN_PATTERNS[0], "$1 [redacted]");
   out = out.replace(TOKEN_PATTERNS[1], "$1[redacted]");
@@ -63,7 +71,16 @@ export function errDetail(err) {
   }
 }
 
-function redactAuth(obj) {
+/**
+ * Redact any value: walks objects and arrays, scrubs strings by pattern, and
+ * blanks an `authorization` key outright wherever it appears.
+ *
+ * Use this, NOT `errDetail`, when the thing being scrubbed is an ordinary
+ * value rather than a thrown error. `errDetail` expects an axios-shaped
+ * error and reaching it with a hand-built `{ response: { data } }` envelope
+ * just to borrow its redaction is a sign this export was what you wanted.
+ */
+export function redactAuth(obj) {
   if (typeof obj === "string") return redactString(obj);
   if (obj == null || typeof obj !== "object") return obj;
   if (Array.isArray(obj)) return obj.map(redactAuth);

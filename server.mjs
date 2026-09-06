@@ -22,9 +22,9 @@ import {
   CallToolRequestSchema
 } from "@modelcontextprotocol/sdk/types.js";
 
-import { errDetail } from "./src/core/util.mjs";
-import { errorResponse } from "./src/core/respond.mjs";
-import { listToolSchemas, getHandler } from "./src/core/registry.mjs";
+import { CONFIG } from "./src/core/config.mjs";
+import { dispatch } from "./src/core/dispatch.mjs";
+import { listToolSchemas } from "./src/core/registry.mjs";
 
 // Load .env next to this file, regardless of the cwd the MCP client
 // launches us from. `quiet: true` because dotenv v17 prints a banner to
@@ -34,7 +34,10 @@ import { listToolSchemas, getHandler } from "./src/core/registry.mjs";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 config({ path: join(__dirname, ".env"), quiet: true });
 
-const SERVER_NAME = process.env.MCP_SERVER_NAME?.trim() || "<SERVER_NAME>";
+// Config is read in exactly ONE place, src/core/config.mjs, which snapshots
+// process.env at import and freezes it. Reading it again here would let the
+// server and its subsystems disagree about their own settings.
+const SERVER_NAME = CONFIG.SERVER_NAME;
 const log = (...args) => console.error(`[${SERVER_NAME}]`, ...args);
 
 /* =========================================================================
@@ -51,9 +54,9 @@ const server = new Server(
 // (default) exposes everything; a specific category value restricts the
 // list, which lets one server file back several differently-scoped MCP
 // client entries sharing the same process/sign-in.
-// .trim() because on Windows, `set MCP_TOOLSET=x && ...` bakes a trailing
-// space into the env var; without trim, filtering silently returns 0 tools.
-const TOOLSET = (process.env.MCP_TOOLSET || "all").trim().toLowerCase();
+// The trailing-whitespace trim that Windows makes necessary now happens in
+// config.mjs, alongside every other env coercion.
+const TOOLSET = CONFIG.TOOLSET;
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: listToolSchemas(TOOLSET)
@@ -62,25 +65,27 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args = {} } = request.params;
 
-  const handler = getHandler(name);
-  if (!handler) return errorResponse(`Unknown tool: ${name}`);
+  // `ctx` is how a handler reaches shared, per-process resources (an API
+  // client, a token cache, a DB pool, ...) without importing them directly -
+  // see src/integrations/README.md. It's empty in the template; build real
+  // resources above this handler and pass them in here.
+  const ctx = {};
 
-  try {
-    // `ctx` is how a handler reaches shared, per-process resources (an API
-    // client, a token cache, a DB pool, ...) without importing them
-    // directly - see src/integrations/README.md. It's empty in the
-    // template; build real resources above this handler and add them here
-    // as your integrations need them.
-    const ctx = {};
-    return await handler(args, ctx);
-  } catch (err) {
-    const detail = errDetail(err); // redacts an Authorization header if present
-    log("Tool call failed:", detail);
-    return errorResponse(`Tool '${name}' failed: ${detail}`);
-  }
+  // Everything between here and the handler (schema validation, the ordered
+  // effect gate, the audit records) lives in src/core/dispatch.mjs. It is one
+  // call rather than inline logic because this file is a wiring layer, and
+  // because a pipeline nobody can bypass is the whole point: a tool cannot be
+  // added that skips a step an author forgot to copy.
+  return await dispatch(name, args, ctx);
 });
 
 const transport = new StdioServerTransport();
 await server.connect(transport);
 
-log(`${SERVER_NAME} MCP running (stdio). Toolset: ${TOOLSET}.`);
+// The run mode belongs in the banner: an operator who cannot tell at a
+// glance whether this process can cause a real effect will eventually
+// assume the wrong one.
+log(
+  `${SERVER_NAME} MCP running (stdio). Toolset: ${TOOLSET}. ` +
+    `Mode: ${CONFIG.DRY_RUN ? "DRY RUN (no outward effects)" : "LIVE"}.`
+);

@@ -11,6 +11,7 @@
  * file is the template's example, not the ceiling.
  */
 
+import { CONFIG } from "../core/config.mjs";
 import { respond } from "../core/respond.mjs";
 import * as E from "../core/emoji.mjs";
 
@@ -19,6 +20,8 @@ const CATEGORY = "system";
 export const tools = [
   {
     category: CATEGORY,
+    // Diagnostics only: reports state, changes none of it.
+    effect: "read",
     schema: {
       name: "health_check",
       description:
@@ -27,7 +30,7 @@ export const tools = [
     },
     handler: async (args) => {
       const mem = process.memoryUsage();
-      const toolset = (process.env.MCP_TOOLSET || "all").trim().toLowerCase();
+      const toolset = CONFIG.TOOLSET;
 
       const text = [
         `${E.OK} Health check - process up ${Math.round(process.uptime())}s`,

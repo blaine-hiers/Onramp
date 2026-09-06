@@ -15,16 +15,29 @@
  * impossible - the schema IS the wiring.
  */
 
+import { isEffectClass } from "./effect.mjs";
+
 import { tools as exampleTools } from "../integrations/example/example-tool.mjs";
+import { tools as confirmExampleTools } from "../integrations/example/confirm-example.mjs";
 import { tools as systemTools } from "../system/health.mjs";
 
 const ALL = [
   ...exampleTools,
+  ...confirmExampleTools,
   ...systemTools
 ];
 
-// Fail fast if two tools declare the same name (would silently overwrite
-// each other in the dispatch map).
+// Fail fast on the two invariants a tool record must satisfy. Both throw at
+// MODULE LOAD rather than at call time, which turns a silent runtime surprise
+// into a startup crash the author sees on the first run.
+//
+// Duplicate name: the later record would silently overwrite the earlier one in
+// the dispatch map, and which one wins depends on import order.
+//
+// Missing effect class: a tool with no declared class would reach the gate and
+// be refused there, one call at a time, forever. Refusing to start is kinder
+// and it makes the declaration impossible to forget rather than merely
+// documented.
 {
   const seen = new Set();
   for (const t of ALL) {
@@ -32,6 +45,13 @@ const ALL = [
       throw new Error(`Duplicate tool name in registry: ${t.schema.name}`);
     }
     seen.add(t.schema.name);
+
+    if (!isEffectClass(t.effect)) {
+      throw new Error(
+        `Tool '${t.schema.name}' must declare effect: "read", "write" or ` +
+          `"irreversible" (got ${JSON.stringify(t.effect)}).`
+      );
+    }
   }
 }
 
@@ -65,4 +85,22 @@ export function getHandler(name) {
 const CATEGORIES = new Map(ALL.map((t) => [t.schema.name, t.category]));
 export function getCategory(name) {
   return CATEGORIES.get(name);
+}
+
+/**
+ * The whole tool record by name: schema, handler, category, effect class and
+ * any optional `resourceId` resolver.
+ *
+ * The dispatcher needs all of it at once. Reaching for four separate lookups
+ * invites a caller to fetch the handler and skip the effect class, which is
+ * the one combination that must never happen.
+ */
+const TOOLS = new Map(ALL.map((t) => [t.schema.name, t]));
+export function getTool(name) {
+  return TOOLS.get(name);
+}
+
+/** Effect class of a tool by name: "read", "write" or "irreversible". */
+export function getEffect(name) {
+  return TOOLS.get(name)?.effect;
 }
